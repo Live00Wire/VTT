@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe | Tabletop Nexus</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --card-hover-bg: rgba(255, 255, 255, 0.1);
+            --accent: #8b5cf6;
+            --accent-hover: #7c3aed;
+            --text-main: #f8fafc;
+            --x-color: #ef4444;
+            --o-color: #3b82f6;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 900px;
+            margin: 2rem auto;
+            text-align: center;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        h2 { font-size: 2.5rem; margin-bottom: 2rem; font-weight: 800; }
+
+        #game-board-container {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px dashed var(--card-border);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(5px);
+            padding: 3rem 0;
+        }
+
+        #status-display {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            min-height: 3rem;
+        }
+
+        .ttt-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            background: var(--card-border);
+            padding: 10px;
+            border-radius: 12px;
+        }
+
+        .ttt-cell {
+            width: 100px;
+            height: 100px;
+            background: var(--bg-gradient);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .ttt-cell:hover { background: var(--card-hover-bg); }
+        .ttt-cell.x { color: var(--x-color); }
+        .ttt-cell.o { color: var(--o-color); }
+
+        .button-group { display: flex; gap: 1rem; justify-content: center; }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        button:hover { background-color: var(--accent-hover); transform: translateY(-2px); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Tic-Tac-Toe</h2>
+        
+        <div id="game-board-container">
+            <div id="status-display">Connecting to server...</div>
+            
+            <div class="ttt-board" id="ttt-board">
+                <div class="ttt-cell" data-index="0"></div>
+                <div class="ttt-cell" data-index="1"></div>
+                <div class="ttt-cell" data-index="2"></div>
+                <div class="ttt-cell" data-index="3"></div>
+                <div class="ttt-cell" data-index="4"></div>
+                <div class="ttt-cell" data-index="5"></div>
+                <div class="ttt-cell" data-index="6"></div>
+                <div class="ttt-cell" data-index="7"></div>
+                <div class="ttt-cell" data-index="8"></div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button onclick="window.location.href='../index.html'">
+                Return to Lobby
+            </button>
+        </div>
+    </div>
+
+    <script>
+    const socket = io();
+    const statusDisplay = document.getElementById('status-display');
+    const tttCells = document.querySelectorAll('.ttt-cell');
+    
+    let mySymbol = '';
+    let playerNames = {}; 
+    let gameActive = false;
+
+    const myUsername = localStorage.getItem('nexusUsername') || 'Guest';
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPrivate = urlParams.get('private') === 'true';
+    const joinCode = urlParams.get('room');
+
+    socket.emit('joinGame', { 
+        type: 'ttt', 
+        username: myUsername, 
+        private: isPrivate, 
+        roomCode: joinCode 
+    });
+
+    socket.on('waitingForOpponent', (code) => {
+        if (code) {
+            statusDisplay.innerHTML = `🔒 Private Room Created!<br>Share this code with your friend: <br><b style="color:var(--accent); font-size:2.5rem; letter-spacing:4px;">${code}</b><br><br>⏳ Waiting for them to join...`;
+        } else {
+            statusDisplay.innerHTML = "⏳ Waiting for a random opponent to join...";
+        }
+        gameActive = false;
+    });
+
+    socket.on('gameStart', (data) => {
+        mySymbol = data.symbols[socket.id];
+        playerNames = data.names; 
+        gameActive = true;
+        updateUI(data.board, data.turn);
+    });
+
+    socket.on('updateBoard', (data) => {
+        updateUI(data.board, data.turn);
+    });
+
+    socket.on('gameOver', (data) => {
+        drawBoard(data.board);
+        gameActive = false;
+        
+        let message = "";
+        if (data.winner === 'Draw') {
+            message = `🤝 Game ended in a Draw!`;
+        } else {
+            const color = data.winner === 'X' ? 'var(--x-color)' : 'var(--o-color)';
+            const winnerName = data.names[data.winner]; 
+            const youWon = data.winner === mySymbol ? "🏆 You won!" : "💀 You lost!";
+            message = `<h3><span style="color: ${color}">${winnerName}</span> wins!</h3>${youWon}`;
+        }
+
+        // Show the Rematch button instead of an auto-reload
+        statusDisplay.innerHTML = `
+            ${message}<br><br>
+            <div class="button-group">
+                <button id="rematch-btn" onclick="requestRematch()">Request Rematch</button>
+            </div>
+        `;
+    });
+
+    socket.on('rematchProposed', () => {
+        const btn = document.getElementById('rematch-btn');
+        if (btn) {
+            btn.innerText = "Opponent wants a rematch! Accept?";
+            btn.style.backgroundColor = "#10b981"; // Turn it green
+        }
+    });
+
+    function requestRematch() {
+        socket.emit('requestRematch');
+        const btn = document.getElementById('rematch-btn');
+        btn.innerText = "Waiting for opponent...";
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+    }
+
+    socket.on('opponentLeft', () => {
+        gameActive = false;
+        statusDisplay.innerHTML = `🔴 Your opponent left the room.<br><br><button onclick="window.location.href='../index.html'">Return to Lobby</button>`;
+    });
+
+    function updateUI(board, turn) {
+        drawBoard(board);
+        const color = turn === 'X' ? 'var(--x-color)' : 'var(--o-color)';
+        const currentTurnName = playerNames[turn]; 
+        const isMyTurnText = turn === mySymbol ? "<b>(Your Turn)</b>" : "";
+        
+        const opponentSymbol = mySymbol === 'X' ? 'O' : 'X';
+        const opponentName = playerNames[opponentSymbol] || "Opponent";
+
+        statusDisplay.innerHTML = `
+            <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">
+                You (${mySymbol}) vs ${opponentName} (${opponentSymbol})
+            </div>
+            <span style="color: ${color}">${currentTurnName}</span>'s turn. ${isMyTurnText}
+        `;
+    }
+
+    function drawBoard(board) {
+        tttCells.forEach((cell, index) => {
+            cell.innerText = board[index];
+            cell.className = 'ttt-cell'; 
+            if (board[index] !== "") {
+                cell.classList.add(board[index].toLowerCase());
+            }
+        });
+    }
+
+    tttCells.forEach(cell => {
+        cell.addEventListener('click', (e) => {
+            if (!gameActive) return;
+            const index = parseInt(e.target.getAttribute('data-index'));
+            socket.emit('makeMove', index);
+        });
+    });
+</script>
+</body>
+</html>

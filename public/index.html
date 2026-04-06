@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabletop Lobby</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --card-hover-bg: rgba(255, 255, 255, 0.1);
+            --card-hover-border: rgba(255, 255, 255, 0.3);
+            --accent: #8b5cf6;
+            --accent-hover: #7c3aed;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            padding: 3rem 0 1rem 0;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -1px;
+            background: linear-gradient(to right, #c4b5fd, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            color: transparent; 
+        }
+
+        header p { color: var(--text-muted); margin-top: 0.5rem; font-size: 1.1rem; }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto 4rem auto;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* --- LOGIN UI --- */
+        #login-view {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 3rem;
+            text-align: center;
+            animation: fadeIn 0.5s ease-out;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            margin-top: 2rem;
+        }
+
+        input[type="text"] {
+            width: 80%;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+            background: rgba(0, 0, 0, 0.2);
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus { border-color: var(--accent); }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+            width: 100%;
+        }
+
+        button:hover { background-color: var(--accent-hover); transform: translateY(-2px); }
+
+        /* --- LOBBY UI --- */
+        #lobby-view {
+            display: none; /* Hidden until login */
+            width: 100%;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .lobby-layout {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        .game-grid {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        /* ... keep your existing :root and general CSS ... */
+
+        .game-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            transition: all 0.3s;
+            width: 100%;
+            max-width: 250px;
+            flex-grow: 1;
+        }
+
+        .game-icon { font-size: 3rem; margin-bottom: 1rem; display: inline-block; transition: transform 0.3s; }
+        .game-card:hover .game-icon { transform: scale(1.1) rotate(5deg); }
+        .game-card h3 { margin: 0 0 0.5rem 0; font-size: 1.5rem; }
+        .game-card p { margin: 0 0 1.5rem 0; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; }
+
+        .card-buttons { display: flex; flex-direction: column; gap: 0.5rem; }
+        .card-buttons button { padding: 0.6rem; font-size: 0.9rem; }
+        .btn-private { background-color: transparent; border: 1px solid var(--accent); }
+        .btn-private:hover { background-color: rgba(139, 92, 246, 0.2); }
+
+        /* --- PRIVATE CODE UI --- */
+        .private-join-box {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+        .private-join-box input { margin: 0; width: 100%; text-transform: uppercase;}
+        .private-join-box button { width: auto; background-color: #10b981; }
+        .private-join-box button:hover { background-color: #059669; }
+
+        /* ... keep your existing chat CSS ... */
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Tabletop Nexus</h1>
+        <p id="header-subtitle">Identify yourself to enter</p>
+    </header>
+
+    <div class="container">
+        <div id="login-view">
+            <h2 style="margin-top: 0;">Who goes there?</h2>
+            <input type="text" id="username-input" placeholder="Enter display name..." onkeypress="handleKeyPress(event, 'login')">
+            <button onclick="login()">Enter Tavern</button>
+        </div>
+
+        <div id="lobby-view" style="display:none; width: 100%; animation: fadeIn 0.5s ease-out;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: start;">
+                
+                <div>
+                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                        <div class="game-card">
+                            <span class="game-icon">❌</span>
+                            <h3>Tic-Tac-Toe</h3>
+                            <p>2 Players</p>
+                            <div class="card-buttons">
+                                <button onclick="window.location.href='games/tic-tac-toe.html'">Find Public Match</button>
+                                <button class="btn-private" onclick="window.location.href='games/tic-tac-toe.html?private=true'">Create Private Room</button>
+                            </div>
+                        </div>
+                        <div class="game-card">
+                            <span class="game-icon">🔴</span>
+                            <h3>Connect Four</h3>
+                            <p>2 Players</p>
+                            <div class="card-buttons">
+                                <button onclick="window.location.href='games/connect-four.html'">Find Public Match</button>
+                                <button class="btn-private" onclick="window.location.href='games/connect-four.html?private=true'">Create Private Room</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="private-join-box">
+                        <input type="text" id="room-code-input" placeholder="Got a room code? Enter here..." maxlength="4">
+                        <button onclick="joinPrivateRoom()">Join Room</button>
+                    </div>
+                </div>
+
+                <div id="chat-container" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 1.5rem; display: flex; flex-direction: column; height: 400px;">
+                    <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 0.5rem;">Global Tavern Chat</h3>
+                    <div id="chat-messages" style="flex-grow: 1; overflow-y: auto; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.9rem;"></div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="chat-input" placeholder="Say hello..." onkeypress="handleKeyPress(event, 'chat')" style="width:100%; padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(0, 0, 0, 0.2); color: white; outline: none;">
+                        <button onclick="sendMessage()" style="width: auto; padding: 0.8rem 1.2rem;">Send</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let myUsername = "";
+
+        function login() {
+            const nameInput = document.getElementById('username-input').value.trim();
+            if (nameInput === "") return;
+            myUsername = nameInput;
+            localStorage.setItem('nexusUsername', myUsername);
+            document.getElementById('login-view').style.display = 'none';
+            document.getElementById('lobby-view').style.display = 'block';
+            document.getElementById('header-subtitle').innerText = "Select a game to begin";
+            socket.emit('joinLobby', myUsername);
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (message !== "") {
+                socket.emit('sendLobbyChat', message);
+                input.value = "";
+            }
+        }
+
+        // --- PRIVATE ROOM LOGIC ---
+        function joinPrivateRoom() {
+            const codeInput = document.getElementById('room-code-input').value.trim();
+            if(codeInput.length === 4) {
+                socket.emit('checkRoom', codeInput); // Ask the server what game this is!
+            } else {
+                alert("Room codes must be 4 characters.");
+            }
+        }
+
+        socket.on('roomFound', (data) => {
+            // Server found it! Redirect to the correct game page with the code.
+            const gamePage = data.type === 'ttt' ? 'tic-tac-toe.html' : 'connect-four.html';
+            window.location.href = `games/${gamePage}?room=${data.code}`;
+        });
+
+        socket.on('roomError', (msg) => { alert(msg); });
+
+        function handleKeyPress(e, type) {
+            if (e.key === 'Enter') {
+                if (type === 'login') login();
+                if (type === 'chat') sendMessage();
+            }
+        }
+
+        socket.on('chatMessage', (data) => {
+            const msgBox = document.getElementById('chat-messages');
+            msgBox.innerHTML += `<div style="background: rgba(0,0,0,0.2); padding: 0.5rem 0.8rem; border-radius: 8px;"><span style="font-weight: 600; color: #c4b5fd; margin-right: 0.3rem;">${data.user}:</span>${data.text}</div>`;
+            msgBox.scrollTop = msgBox.scrollHeight;
+        });
+
+        socket.on('systemMessage', (text) => {
+            const msgBox = document.getElementById('chat-messages');
+            msgBox.innerHTML += `<div style="color: #94a3b8; font-style: italic; text-align: center; font-size: 0.8rem;">${text}</div>`;
+            msgBox.scrollTop = msgBox.scrollHeight;
+        });
+
+        window.onload = () => {
+            const savedName = localStorage.getItem('nexusUsername');
+            if (savedName) {
+                document.getElementById('username-input').value = savedName;
+                login();
+            }
+        }
+    </script>
+</body>
+</html>
