@@ -26,14 +26,24 @@
             background: var(--bg-gradient); z-index: 50; flex-direction: column; 
             align-items: center; justify-content: center; text-align: center;
         }
+        
         .player-list-box {
             background: rgba(0,0,0,0.3); border: 1px solid var(--card-border); border-radius: 16px;
             padding: 2rem; width: 350px; margin-bottom: 2rem; text-align: left;
         }
+        
         .lobby-player-row {
             padding: 1rem 0; border-bottom: 1px solid rgba(255,255,255,0.1);
             font-size: 1.2rem; display: flex; align-items: center; gap: 10px;
         }
+        
+        .settings-panel {
+            background: rgba(0,0,0,0.3); border: 1px solid var(--card-border); border-radius: 12px;
+            padding: 1.5rem; text-align: left; margin-bottom: 2rem;
+        }
+        
+        .settings-panel label { display: block; margin-bottom: 10px; cursor: pointer; font-size: 1.1rem; }
+        .settings-panel input { transform: scale(1.3); margin-right: 10px; accent-color: var(--accent); }
 
         .arena {
             display: none; 
@@ -51,6 +61,7 @@
             background: rgba(0,0,0,0.4); border: 1px solid var(--card-border); border-radius: 12px;
             padding: 1rem; text-align: center; min-width: 120px; transition: all 0.3s;
         }
+        
         .opp-plate.active-turn { border-color: var(--accent); box-shadow: 0 0 15px var(--accent); transform: scale(1.05); }
         .opp-cards { font-size: 1.5rem; font-weight: 800; margin-top: 5px; }
 
@@ -58,21 +69,17 @@
         #turn-timer { font-size: 1.5rem; font-weight: 800; color: #eab308; margin-top: 10px;}
 
         .card-cluster { display: flex; gap: 1rem; position: relative; z-index: 5; }
+        
         .uno-card {
             width: 70px; height: 100px; border-radius: 8px; border: 3px solid white;
             display: flex; align-items: center; justify-content: center;
             font-size: 2rem; font-weight: 800; color: white;
             text-shadow: 2px 2px 0px rgba(0,0,0,0.4); box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            cursor: pointer; transition: transform 0.2s; user-select: none; flex-shrink: 0;
+            cursor: pointer; transition: transform 0.2s; user-select: none; flex-shrink: 0; position: relative;
         }
-        .uno-card:hover { transform: translateY(-15px); z-index: 10; }
         
-        .uno-card.disabled-card { 
-            opacity: 0.35 !important; 
-            cursor: not-allowed !important; 
-            pointer-events: none !important; 
-            filter: grayscale(30%) !important; 
-        }
+        .uno-card:hover { transform: translateY(-15px); z-index: 10; }
+        .uno-card.disabled-card { opacity: 0.35 !important; cursor: not-allowed !important; pointer-events: none !important; filter: grayscale(30%) !important; }
         
         .bg-red { background-color: #ef4444; } .bg-blue { background-color: #3b82f6; }
         .bg-green { background-color: #10b981; } .bg-yellow { background-color: #eab308; }
@@ -80,36 +87,37 @@
         .bg-wild { background: conic-gradient(from 45deg, #ef4444 25%, #eab308 25% 50%, #10b981 50% 75%, #3b82f6 75%); }
 
         @keyframes slideFromDeck { 0% { opacity: 0; transform: translateY(-40vh) scale(0.3); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
-        .slide-anim { animation: slideFromDeck 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+        .slide-anim { animation: slideFromDeck 0.5s cubic-bezier(0.25, 1, 0.5, 1) both; }
 
         .bouncing-arrow {
-            position: absolute;
-            top: -45px;
-            left: 20px;
-            font-size: 2.5rem;
-            color: #eab308;
-            display: none;
-            animation: bounce 1s infinite;
-            z-index: 20;
-            pointer-events: none;
-            text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
+            position: absolute; top: -45px; left: 0; width: 100%; text-align: center;
+            font-size: 2.5rem; color: #eab308; display: none;
+            animation: bounce 1s infinite; z-index: 20; pointer-events: none; text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
         }
         
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-15px); }
-        }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
 
-        #direction-ring { position: absolute; width: 220px; height: 220px; border: 4px dashed rgba(255,255,255,0.2); border-radius: 50%; z-index: 1; transition: transform 1s ease-in-out; pointer-events: none; }
-        .spin-cw { animation: spin 10s linear infinite; } .spin-ccw { animation: spinReverse 10s linear infinite; }
-        @keyframes spin { 100% { transform: rotate(360deg); } } @keyframes spinReverse { 100% { transform: rotate(-360deg); } }
+        #direction-ring { position: absolute; width: 340px; height: 340px; z-index: 1; pointer-events: none; opacity: 0.2; }
+        .spin-cw { animation: spin 12s linear infinite; } 
+        .spin-ccw { animation: spinReverse 12s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } } 
+        @keyframes spinReverse { 0% { transform: scaleX(-1) rotate(0deg); } 100% { transform: scaleX(-1) rotate(-360deg); } }
+
+        .stack-bubble {
+            position: absolute; top: -15px; right: -15px; background: #ef4444; color: white;
+            font-size: 1.2rem; font-weight: 800; width: 35px; height: 35px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 2px solid white; z-index: 25;
+        }
 
         .action-bar { display: flex; gap: 1rem; margin-bottom: 1rem; min-height: 45px; }
         .uno-btn { padding: 0.8rem 1.5rem; font-size: 1rem; font-weight: 800; border-radius: 50px; border: 2px solid white; cursor: pointer; color: white; transition: all 0.2s;}
+        
         #call-uno-btn { background-color: transparent; border-color: #eab308; color: #eab308; display: none; }
         #call-uno-btn.active { background-color: #eab308; color: white; cursor: default; pointer-events: none; }
         #catch-btn { background-color: #ef4444; border-color: #ef4444; display: none; }
         #catch-btn:hover { background-color: #dc2626; transform: scale(1.05); }
+        #pass-btn { background-color: #3b82f6; border-color: #3b82f6; display: none; }
         #start-game-btn { background-color: #10b981; border-color: #10b981; font-size: 1.5rem; padding: 1rem 3rem; }
         #start-game-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
@@ -125,9 +133,25 @@
         <h2 style="font-size: 2.5rem; margin-bottom: 0;">UNO</h2>
         <h1 style="color: var(--accent); font-size: 4rem; margin-top: 0; letter-spacing: 5px;" id="lobby-code-display"></h1>
         
-        <div class="player-list-box">
-            <h3 style="margin-top: 0; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;" id="lobby-count-text">Players (1/4)</h3>
-            <div id="lobby-players-list"></div>
+        <div style="display: flex; gap: 2rem; align-items: flex-start; margin-top: 1rem;">
+            <div class="player-list-box">
+                <h3 style="margin-top: 0; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;" id="lobby-count-text">Players (1/4)</h3>
+                <div id="lobby-players-list"></div>
+            </div>
+
+            <div class="settings-panel" id="host-settings-panel" style="display: none;">
+                <h3 style="margin-top: 0; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">House Rules</h3>
+                <label><input type="checkbox" id="rule-playDrawn" checked onchange="pushRules()"> Play Drawn Card</label>
+                <label><input type="checkbox" id="rule-drawUntilPlay" onchange="pushRules()"> Draw 'Til You Play</label>
+                <label><input type="checkbox" id="rule-stacking" onchange="pushRules()"> +2 / +4 Stacking</label>
+                <label><input type="checkbox" id="rule-jumpIn" onchange="pushRules()"> Jump-In (Exact Match)</label>
+                <label><input type="checkbox" id="rule-zeroPass" onchange="pushRules()"> 0-Card Rotates Hands</label>
+            </div>
+            
+            <div class="settings-panel" id="guest-rules-panel" style="display: none;">
+                <h3 style="margin-top: 0; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">Active Rules</h3>
+                <div id="active-rules-list" style="color: var(--text-muted);">Standard</div>
+            </div>
         </div>
 
         <button id="start-game-btn" class="uno-btn" style="display: none;" onclick="startPrivateGame()">Start Game</button>
@@ -147,11 +171,25 @@
         <div class="pos-right" id="slot-right"></div>
 
         <div class="pos-center">
-            <div id="direction-ring" class="spin-cw"></div>
+            <svg id="direction-ring" class="spin-cw" viewBox="0 0 200 200">
+                <defs>
+                    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                      <path d="M 0 1 L 8 5 L 0 9 z" fill="#fff" />
+                    </marker>
+                </defs>
+                <path d="M 100 10 A 90 90 0 0 1 190 100" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
+                <path d="M 190 100 A 90 90 0 0 1 100 190" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
+                <path d="M 100 190 A 90 90 0 0 1 10 100" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
+                <path d="M 10 100 A 90 90 0 0 1 100 10" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
+            </svg>
+
             <div id="turn-timer">15s</div>
             <div class="card-cluster">
-                <div id="draw-arrow" class="bouncing-arrow">⬇</div>
-                <div id="draw-deck" class="uno-card bg-deck" onclick="drawCard()">DRAW</div>
+                <div id="draw-deck" class="uno-card bg-deck" onclick="drawCard()">
+                    <div id="draw-arrow" class="bouncing-arrow">⬇</div>
+                    DRAW
+                    <div id="stack-bubble" class="stack-bubble" style="display: none;"></div>
+                </div>
                 <div id="discard-pile" class="uno-card bg-red"></div>
             </div>
         </div>
@@ -160,7 +198,9 @@
             <div class="action-bar">
                 <button id="call-uno-btn" class="uno-btn" onclick="toggleUno()">Call UNO!</button>
                 <button id="catch-btn" class="uno-btn" onclick="catchUno()">Catch!</button>
+                <button id="pass-btn" class="uno-btn" onclick="passTurn()">End Turn</button>
             </div>
+            <div id="my-card-count" style="margin-bottom: 5px; color: var(--text-muted); font-weight: 600; font-size: 1.1rem;"></div>
             <div id="my-hand" style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;"></div>
         </div>
     </div>
@@ -182,10 +222,13 @@
         const statusDisplay = document.getElementById('status-display');
         const discardPile = document.getElementById('discard-pile');
         const drawDeck = document.getElementById('draw-deck');
+        const stackBubble = document.getElementById('stack-bubble');
         const myHandContainer = document.getElementById('my-hand');
+        const myCardCount = document.getElementById('my-card-count');
         const colorModal = document.getElementById('color-modal');
         const callUnoBtn = document.getElementById('call-uno-btn');
         const catchBtn = document.getElementById('catch-btn');
+        const passBtn = document.getElementById('pass-btn');
         const dirRing = document.getElementById('direction-ring');
         const timerDisplay = document.getElementById('turn-timer');
         
@@ -200,7 +243,7 @@
         function playSound(type) {
             if (sounds[type]) {
                 sounds[type].currentTime = 0; 
-                sounds[type].play().catch(err => console.log("Audio waiting for user interaction."));
+                sounds[type].play().catch(err => {});
             }
         }
 
@@ -213,6 +256,7 @@
         let turnTimerInterval;
         let timeLeft = 15;
         let previousHandCount = 0; 
+        let isLobbyHost = false;
 
         const myUsername = localStorage.getItem('nexusUsername') || 'Guest';
         const urlParams = new URLSearchParams(window.location.search);
@@ -237,19 +281,50 @@
                 listEl.innerHTML += `<div class="lobby-player-row">${isHost ? 'Host' : 'Player'} | <b>${p.name}</b></div>`;
             });
 
+            isLobbyHost = (socket.id === data.hostId);
             const startBtn = document.getElementById('start-game-btn');
             const waitText = document.getElementById('guest-wait-text');
 
-            if (socket.id === data.hostId) {
+            if (isLobbyHost) {
                 startBtn.style.display = 'inline-block';
                 waitText.style.display = 'none';
                 startBtn.disabled = data.players.length < 2; 
                 startBtn.innerText = data.players.length < 2 ? "Waiting for players..." : "Start Game";
+                document.getElementById('host-settings-panel').style.display = 'block';
+                document.getElementById('guest-rules-panel').style.display = 'none';
             } else {
                 startBtn.style.display = 'none';
                 waitText.style.display = 'block';
+                document.getElementById('host-settings-panel').style.display = 'none';
+                document.getElementById('guest-rules-panel').style.display = 'block';
             }
+            
+            updateGuestRulesText(data.rules);
         });
+
+        function pushRules() {
+            if (!isLobbyHost) return;
+            const rules = {
+                playDrawn: document.getElementById('rule-playDrawn').checked,
+                drawUntilPlay: document.getElementById('rule-drawUntilPlay').checked,
+                stacking: document.getElementById('rule-stacking').checked,
+                jumpIn: document.getElementById('rule-jumpIn').checked,
+                zeroPass: document.getElementById('rule-zeroPass').checked
+            };
+            socket.emit('updateRules', rules);
+        }
+
+        socket.on('rulesUpdated', (rules) => { updateGuestRulesText(rules); });
+
+        function updateGuestRulesText(rules) {
+            let active = [];
+            if (rules.playDrawn) active.push("Play Drawn Card");
+            if (rules.drawUntilPlay) active.push("Draw 'Til You Play");
+            if (rules.stacking) active.push("Stacking");
+            if (rules.jumpIn) active.push("Jump-In");
+            if (rules.zeroPass) active.push("0-Card Rotation");
+            document.getElementById('active-rules-list').innerText = active.length > 0 ? active.join(' • ') : "Standard Rules";
+        }
 
         function startPrivateGame() { socket.emit('hostStartGame'); }
 
@@ -290,10 +365,8 @@
         socket.on('playerCalledUno', () => {
             playSound('uno');
             const originalText = statusDisplay.innerHTML;
-            statusDisplay.innerHTML = `<span style="color: #eab308; font-size: 1.5rem; font-weight: bold;">📢 UNO called!</span>`;
-            setTimeout(() => {
-                if(gameActive) statusDisplay.innerHTML = originalText;
-            }, 1500); 
+            statusDisplay.innerHTML = `<span style="color: #eab308; font-size: 1.5rem; font-weight: bold;">UNO called!</span>`;
+            setTimeout(() => { if(gameActive) statusDisplay.innerHTML = originalText; }, 1500); 
         });
 
         function requestRematch() {
@@ -302,18 +375,16 @@
             if(btn) { btn.innerText = "Waiting for others..."; btn.disabled = true; }
         }
 
-        function toggleUno() {
-            playSound('uno');
-            socket.emit('makeMove', { action: 'call_uno' });
-        }
+        function toggleUno() { playSound('uno'); socket.emit('makeMove', { action: 'call_uno' }); }
         
         function catchUno() { if (gameActive) socket.emit('makeMove', { action: 'catch' }); }
         
         function drawCard() { 
-            if (gameActive) {
-                playSound('draw');
-                socket.emit('makeMove', { action: 'draw' }); 
-            }
+            if (gameActive) { socket.emit('makeMove', { action: 'draw' }); }
+        }
+        
+        function passTurn() { 
+            if (gameActive) socket.emit('makeMove', { action: 'pass' }); 
         }
 
         function getCardDisplayValue(v) {
@@ -327,18 +398,16 @@
             const activeColor = topCard.chosenColor || topCard.color;
             return card.color === activeColor || card.value === topCard.value;
         }
+        function canJumpIn(card, topCard) {
+            return card.color !== 'wild' && card.color === topCard.color && card.value === topCard.value;
+        }
 
         function startTimer() {
             clearInterval(turnTimerInterval);
-            timeLeft = 15;
-            timerDisplay.innerText = `${timeLeft}s`;
+            timeLeft = 15; timerDisplay.innerText = `${timeLeft}s`;
             turnTimerInterval = setInterval(() => {
-                timeLeft--;
-                timerDisplay.innerText = `${timeLeft}s`;
-                if (timeLeft <= 0) {
-                    clearInterval(turnTimerInterval);
-                    timerDisplay.innerText = "Time's up!";
-                }
+                timeLeft--; timerDisplay.innerText = `${timeLeft}s`;
+                if (timeLeft <= 0) { clearInterval(turnTimerInterval); timerDisplay.innerText = "Time's up!"; }
             }, 1000);
         }
 
@@ -352,15 +421,11 @@
 
             dirRing.className = state.direction === 1 ? 'spin-cw' : 'spin-ccw';
             
-            if (state.unoSafe) {
-                callUnoBtn.classList.add('active');
-                callUnoBtn.innerText = "UNO! (Safe)";
-            } else {
-                callUnoBtn.classList.remove('active');
-                callUnoBtn.innerText = "Call UNO!";
-            }
+            if (state.unoSafe) { callUnoBtn.classList.add('active'); callUnoBtn.innerText = "UNO! (Safe)"; } 
+            else { callUnoBtn.classList.remove('active'); callUnoBtn.innerText = "Call UNO!"; }
             
-            callUnoBtn.style.display = state.myHand.length <= 2 ? 'inline-block' : 'none';
+            callUnoBtn.style.display = (state.myHand.length <= 2 && isMyTurn) ? 'inline-block' : 'none';
+            passBtn.style.display = (isMyTurn && state.hasDrawn) ? 'inline-block' : 'none';
             
             let anyoneVulnerable = false;
             for (const opp in state.opponentCards) {
@@ -377,14 +442,24 @@
                 <span style="color: var(--accent);">${playerNames[state.currentTurn]}</span> is thinking... ${isMyTurnText}
             `;
 
+            if (state.stackPenalty > 0) {
+                stackBubble.innerText = `+${state.stackPenalty}`;
+                stackBubble.style.display = 'flex';
+                statusDisplay.innerHTML += `<div style="color: #ef4444; font-weight: bold; animation: pulse 0.5s infinite;">STACK INCOMING! Play a + card or Draw!</div>`;
+            } else {
+                stackBubble.style.display = 'none';
+            }
+
             const displayColor = state.topCard.color === 'wild' ? state.topCard.chosenColor : state.topCard.color;
             discardPile.className = `uno-card bg-${displayColor}`;
             discardPile.innerText = getCardDisplayValue(state.topCard.value);
-            drawDeck.classList.toggle('disabled-card', !isMyTurn);
-
-            myHandContainer.innerHTML = '';
-            const isDrawing = state.myHand.length > previousHandCount;
             
+            drawDeck.classList.toggle('disabled-card', !isMyTurn || state.hasDrawn);
+
+            myCardCount.innerText = `Your Hand: ${state.myHand.length} Cards`;
+            myHandContainer.innerHTML = '';
+            
+            const isDrawing = state.myHand.length > previousHandCount;
             let hasPlayableCard = false; 
             
             state.myHand.forEach((card, index) => {
@@ -392,13 +467,28 @@
                 cardEl.className = `uno-card bg-${card.color}`;
                 cardEl.innerText = getCardDisplayValue(card.value);
 
-                if (isDrawing && index >= previousHandCount) cardEl.classList.add('slide-anim');
+                if (isDrawing && index >= previousHandCount) {
+                    cardEl.classList.add('slide-anim');
+                    const delay = (index - previousHandCount) * 0.15;
+                    cardEl.style.animationDelay = `${delay}s`;
+                    setTimeout(() => { if (gameActive) playSound('draw'); }, delay * 1000);
+                }
                 
-                if (!isMyTurn || !canPlay(card, state.topCard)) {
+                let cardIsPlayable = false;
+                if (isMyTurn) {
+                    if (state.stackPenalty > 0) {
+                        cardIsPlayable = (card.value === 'draw2' || card.value === 'wild4');
+                    } else {
+                        cardIsPlayable = canPlay(card, state.topCard);
+                    }
+                } else if (state.rules.jumpIn && state.stackPenalty === 0) {
+                    cardIsPlayable = canJumpIn(card, state.topCard);
+                }
+                
+                if (!cardIsPlayable) {
                     cardEl.classList.add('disabled-card');
                 } else {
-                    hasPlayableCard = true; 
-                    
+                    if (isMyTurn) hasPlayableCard = true; 
                     cardEl.onclick = () => {
                         if (!gameActive) return;
                         if (card.color === 'wild') {
@@ -414,11 +504,8 @@
             previousHandCount = state.myHand.length;
 
             const drawArrow = document.getElementById('draw-arrow');
-            if (isMyTurn && !hasPlayableCard) {
-                drawArrow.style.display = 'block';
-            } else {
-                drawArrow.style.display = 'none';
-            }
+            if (isMyTurn && !hasPlayableCard && !state.hasDrawn) drawArrow.style.display = 'block';
+            else drawArrow.style.display = 'none';
 
             const order = state.playerOrder;
             const myIndex = order.indexOf(mySymbol);
@@ -436,11 +523,8 @@
                 
                 let warning = '';
                 if (count === 1) {
-                    if (state.safePlayers[oppSymbol]) {
-                        warning = '<div style="color:#10b981; font-size:0.8rem; font-weight:bold;">UNO! (Safe)</div>';
-                    } else {
-                        warning = '<div style="color:#ef4444; font-size:0.8rem; font-weight:bold; animation:pulse 1s infinite;">1 CARD!</div>';
-                    }
+                    if (state.safePlayers[oppSymbol]) warning = '<div style="color:#10b981; font-size:0.8rem; font-weight:bold;">UNO! (Safe)</div>';
+                    else warning = '<div style="color:#ef4444; font-size:0.8rem; font-weight:bold; animation:pulse 1s infinite;">1 CARD!</div>';
                 }
                 
                 slot.innerHTML = `
@@ -453,8 +537,7 @@
             }
 
             if (order.length === 2) {
-                renderOpp('slot-top', order[leftIndex]); 
-                renderOpp('slot-left', null); renderOpp('slot-right', null);
+                renderOpp('slot-top', order[leftIndex]); renderOpp('slot-left', null); renderOpp('slot-right', null);
             } else if (order.length === 3) {
                 renderOpp('slot-left', order[leftIndex]); renderOpp('slot-right', order[topIndex]); renderOpp('slot-top', null);
             } else {
@@ -463,8 +546,7 @@
         }
 
         function selectColor(color) {
-            playSound('play');
-            colorModal.style.display = 'none';
+            playSound('play'); colorModal.style.display = 'none';
             socket.emit('makeMove', { action: 'play', cardIndex: pendingWildCardIndex, declaredColor: color });
         }
 

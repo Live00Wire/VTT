@@ -29,13 +29,45 @@ function getLobbyState(room, code, max) {
         code: code,
         players: room.players.map(id => ({ id: id, name: room.usernames[id] })),
         hostId: room.host,
-        maxPlayers: max
+        maxPlayers: max,
+        rules: room.rules 
     };
+}
+
+function resetTurnTimer(roomId, io) {
+    const room = rooms[roomId];
+    if (!room || !room.isStarted || !room.gameInstance || room.gameInstance.winner || room.type !== 'uno') {
+        if (room && room.turnTimer) clearTimeout(room.turnTimer);
+        return;
+    }
+
+    if (room.turnTimer) clearTimeout(room.turnTimer);
+
+    room.turnTimer = setTimeout(() => {
+        const game = room.gameInstance;
+        if (!game) return;
+        
+        const currentPlayerId = game.players[game.turnIndex];
+        const isValidMove = game.makeMove(currentPlayerId, { action: 'timeout' });
+        
+        if (isValidMove) {
+            if (game.winner) {
+                io.to(roomId).emit('gameOver', { board: game.board, winner: game.winner, names: room.nameMap });
+                room.rematchRequests = [];
+                clearTimeout(room.turnTimer);
+            } else {
+                room.players.forEach(pId => {
+                    io.to(pId).emit('updateSecretBoard', game.getGameStateForPlayer(pId));
+                });
+                resetTurnTimer(roomId, io);
+            }
+        }
+    }, 15000);
 }
 
 function startGameInstance(room, roomId, io) {
     const GameClass = GameConfig[room.type].class;
-    room.gameInstance = new GameClass(room.players);
+    room.gameInstance = new GameClass(room.players, room.rules);
     
     const nameMap = {};
     room.players.forEach(id => {
@@ -52,37 +84,31 @@ function startGameInstance(room, roomId, io) {
             });
         });
     } else {
-        io.to(roomId).emit('gameStart', {
-            board: room.gameInstance.board,
-            turn: room.gameInstance.turn,
-            symbols: room.gameInstance.symbols,
-            names: room.nameMap
-        });
+        io.to(roomId).emit('gameStart', { board: room.gameInstance.board, turn: room.gameInstance.turn, symbols: room.gameInstance.symbols, names: room.nameMap });
     }
-    console.log(`⚔️ Match started in room ${roomId}`);
+    console.log(`Match started in room ${roomId}`);
+    
+    if (room.type === 'uno') resetTurnTimer(roomId, io);
 }
 
 io.on('connection', (socket) => {
-    console.log('🟢 Player connected:', socket.id);
+    console.log('Player connected:', socket.id);
 
     socket.on('joinLobby', (username) => {
         socket.username = username;
         socket.join('lobby');
-        io.to('lobby').emit('systemMessage', `👋 ${username} has entered the tavern.`);
+        io.to('lobby').emit('systemMessage', `${username} has entered the tavern.`);
     });
 
     socket.on('sendLobbyChat', (message) => {
-        if (socket.username) {
-            io.to('lobby').emit('chatMessage', { user: socket.username, text: message });
-        }
+        if (socket.username) io.to('lobby').emit('chatMessage', { user: socket.username, text: message });
     });
 
     socket.on('checkRoom', (code) => {
         code = code.toUpperCase();
         const room = rooms[code];
         if (room && !room.isStarted && room.isPrivate) {
-            const config = GameConfig[room.type];
-            if (room.players.length < config.maxPlayers) {
+            if (room.players.length < GameConfig[room.type].maxPlayers) {
                 socket.emit('roomFound', { type: room.type, code: code });
                 return;
             }
@@ -99,6 +125,7 @@ io.on('connection', (socket) => {
         const config = GameConfig[gameType];
         const maxPlayers = config.maxPlayers;
         const isManualStart = config.manualStart;
+        const defaultRules = { playDrawn: true, drawUntilPlay: false, stacking: false, jumpIn: false, zeroPass: false };
 
         if (joinCode) {
             const room = rooms[joinCode];
@@ -112,15 +139,12 @@ io.on('connection', (socket) => {
                     io.to(joinCode).emit('lobbyUpdate', getLobbyState(room, joinCode, maxPlayers));
                 } else {
                     if (room.players.length === maxPlayers) {
-                        room.isStarted = true;
-                        startGameInstance(room, joinCode, io);
+                        room.isStarted = true; startGameInstance(room, joinCode, io);
                     } else {
                         socket.emit('waitingForOpponent', joinCode);
                     }
                 }
-            } else {
-                socket.emit('opponentLeft'); 
-            }
+            } else { socket.emit('opponentLeft'); }
             return;
         } 
         else if (isCreatingPrivate) {
@@ -128,70 +152,55 @@ io.on('connection', (socket) => {
             socket.join(newCode);
             socket.roomId = newCode;
             rooms[newCode] = {
-                type: gameType,
-                players: [socket.id],
-                usernames: { [socket.id]: username },
-                gameInstance: null,
-                isPrivate: true,
-                isStarted: false,
-                host: socket.id, 
-                rematchRequests: []
+                type: gameType, players: [socket.id], usernames: { [socket.id]: username },
+                gameInstance: null, isPrivate: true, isStarted: false, host: socket.id, rematchRequests: [],
+                rules: defaultRules, turnTimer: null
             };
 
-            if (isManualStart) {
-                socket.emit('lobbyUpdate', getLobbyState(rooms[newCode], newCode, maxPlayers));
-            } else {
-                socket.emit('waitingForOpponent', newCode);
-            }
+            if (isManualStart) socket.emit('lobbyUpdate', getLobbyState(rooms[newCode], newCode, maxPlayers));
+            else socket.emit('waitingForOpponent', newCode);
             return; 
         } 
         else {
             let roomToJoin = null;
             for (const roomId in rooms) {
                 if (rooms[roomId].type === gameType && rooms[roomId].players.length < maxPlayers && !rooms[roomId].isPrivate && !rooms[roomId].isStarted) {
-                    roomToJoin = roomId;
-                    break;
+                    roomToJoin = roomId; break;
                 }
             }
 
             if (roomToJoin) {
                 const room = rooms[roomToJoin];
-                room.players.push(socket.id);
-                room.usernames[socket.id] = username;
-                socket.join(roomToJoin);
-                socket.roomId = roomToJoin; 
+                room.players.push(socket.id); room.usernames[socket.id] = username;
+                socket.join(roomToJoin); socket.roomId = roomToJoin; 
 
                 if (isManualStart) {
                     io.to(roomToJoin).emit('lobbyUpdate', getLobbyState(room, null, maxPlayers));
                 } else {
                     if (room.players.length === maxPlayers) {
-                        room.isStarted = true;
-                        startGameInstance(room, roomToJoin, io);
-                    } else {
-                        socket.emit('waitingForOpponent', null);
-                    }
+                        room.isStarted = true; startGameInstance(room, roomToJoin, io);
+                    } else { socket.emit('waitingForOpponent', null); }
                 }
             } else {
                 const newRoomId = 'room_' + socket.id;
-                socket.join(newRoomId);
-                socket.roomId = newRoomId;
+                socket.join(newRoomId); socket.roomId = newRoomId;
                 rooms[newRoomId] = {
-                    type: gameType,
-                    players: [socket.id],
-                    usernames: { [socket.id]: username },
-                    gameInstance: null,
-                    isPrivate: false,
-                    isStarted: false,
-                    host: socket.id,
-                    rematchRequests: []
+                    type: gameType, players: [socket.id], usernames: { [socket.id]: username },
+                    gameInstance: null, isPrivate: false, isStarted: false, host: socket.id, rematchRequests: [],
+                    rules: defaultRules, turnTimer: null
                 };
 
-                if (isManualStart) {
-                    socket.emit('lobbyUpdate', getLobbyState(rooms[newRoomId], null, maxPlayers));
-                } else {
-                    socket.emit('waitingForOpponent', null); 
-                }
+                if (isManualStart) socket.emit('lobbyUpdate', getLobbyState(rooms[newRoomId], null, maxPlayers));
+                else socket.emit('waitingForOpponent', null); 
             }
+        }
+    });
+
+    socket.on('updateRules', (rules) => {
+        const roomId = socket.roomId;
+        if (roomId && rooms[roomId] && rooms[roomId].host === socket.id && !rooms[roomId].isStarted) {
+            rooms[roomId].rules = rules;
+            socket.to(roomId).emit('rulesUpdated', rules);
         }
     });
 
@@ -214,14 +223,12 @@ io.on('connection', (socket) => {
         const isValidMove = game.makeMove(socket.id, moveData);
 
         if (isValidMove) {
-            // Trigger the global UNO sound effect for everyone else
-            if (moveData.action === 'call_uno') {
-                socket.to(roomId).emit('playerCalledUno');
-            }
+            if (moveData.action === 'call_uno') socket.to(roomId).emit('playerCalledUno');
 
             if (game.winner) {
                 io.to(roomId).emit('gameOver', { board: game.board, winner: game.winner, names: rooms[roomId].nameMap });
                 rooms[roomId].rematchRequests = []; 
+                if (rooms[roomId].turnTimer) clearTimeout(rooms[roomId].turnTimer);
             } else {
                 if (typeof game.getGameStateForPlayer === 'function') {
                     rooms[roomId].players.forEach(playerId => {
@@ -230,6 +237,7 @@ io.on('connection', (socket) => {
                 } else {
                     io.to(roomId).emit('updateBoard', { board: game.board, turn: game.turn });
                 }
+                if (rooms[roomId].type === 'uno') resetTurnTimer(roomId, io);
             }
         }
     });
@@ -243,32 +251,27 @@ io.on('connection', (socket) => {
         if (room.rematchRequests.length === room.players.length) {
             room.rematchRequests = []; 
             startGameInstance(room, roomId, io);
-        } else {
-            socket.to(roomId).emit('rematchProposed');
-        }
+        } else { socket.to(roomId).emit('rematchProposed'); }
     });
 
     socket.on('disconnect', () => {
-        if (socket.username) {
-            io.to('lobby').emit('systemMessage', `🚪 ${socket.username} left the tavern.`);
-        }
+        if (socket.username) io.to('lobby').emit('systemMessage', `${socket.username} left the tavern.`);
         const roomId = socket.roomId;
         if (roomId && rooms[roomId]) {
+            if (rooms[roomId].turnTimer) clearTimeout(rooms[roomId].turnTimer);
             if (!rooms[roomId].isStarted && rooms[roomId].isPrivate && GameConfig[rooms[roomId].type].manualStart) {
                 rooms[roomId].players = rooms[roomId].players.filter(id => id !== socket.id);
                 if (rooms[roomId].host === socket.id || rooms[roomId].players.length === 0) {
-                    socket.to(roomId).emit('opponentLeft');
-                    delete rooms[roomId];
+                    socket.to(roomId).emit('opponentLeft'); delete rooms[roomId];
                 } else {
                     io.to(roomId).emit('lobbyUpdate', getLobbyState(rooms[roomId], roomId, GameConfig[rooms[roomId].type].maxPlayers));
                 }
             } else {
-                socket.to(roomId).emit('opponentLeft');
-                delete rooms[roomId];
+                socket.to(roomId).emit('opponentLeft'); delete rooms[roomId];
             }
         }
     });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => { console.log(`🚀 Server running on port ${PORT}`); });
+server.listen(PORT, () => { console.log(`Server running on port ${PORT}`); });
