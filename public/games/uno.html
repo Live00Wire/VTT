@@ -21,7 +21,6 @@
             margin: 0; padding: 0; min-height: 100vh; overflow: hidden; 
         }
 
-        /* --- PREGAME LOBBY OVERLAY --- */
         #pregame-lobby {
             display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: var(--bg-gradient); z-index: 50; flex-direction: column; 
@@ -36,7 +35,6 @@
             font-size: 1.2rem; display: flex; align-items: center; gap: 10px;
         }
 
-        /* --- THE TABLE ARENA --- */
         .arena {
             display: none; 
             grid-template-columns: 200px 1fr 200px; grid-template-rows: 150px 1fr 200px;
@@ -59,7 +57,6 @@
         #game-header { position: absolute; top: 1rem; left: 1rem; z-index: 10; }
         #turn-timer { font-size: 1.5rem; font-weight: 800; color: #eab308; margin-top: 10px;}
 
-        /* --- CARDS --- */
         .card-cluster { display: flex; gap: 1rem; position: relative; z-index: 5; }
         .uno-card {
             width: 70px; height: 100px; border-radius: 8px; border: 3px solid white;
@@ -70,7 +67,6 @@
         }
         .uno-card:hover { transform: translateY(-15px); z-index: 10; }
         
-        /* CSS BUG FIX: Force override with !important */
         .uno-card.disabled-card { 
             opacity: 0.35 !important; 
             cursor: not-allowed !important; 
@@ -86,12 +82,28 @@
         @keyframes slideFromDeck { 0% { opacity: 0; transform: translateY(-40vh) scale(0.3); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
         .slide-anim { animation: slideFromDeck 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
 
-        /* --- DIRECTION RING --- */
+        .bouncing-arrow {
+            position: absolute;
+            top: -45px;
+            left: 20px;
+            font-size: 2.5rem;
+            color: #eab308;
+            display: none;
+            animation: bounce 1s infinite;
+            z-index: 20;
+            pointer-events: none;
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
         #direction-ring { position: absolute; width: 220px; height: 220px; border: 4px dashed rgba(255,255,255,0.2); border-radius: 50%; z-index: 1; transition: transform 1s ease-in-out; pointer-events: none; }
         .spin-cw { animation: spin 10s linear infinite; } .spin-ccw { animation: spinReverse 10s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } } @keyframes spinReverse { 100% { transform: rotate(-360deg); } }
 
-        /* --- BUTTONS --- */
         .action-bar { display: flex; gap: 1rem; margin-bottom: 1rem; min-height: 45px; }
         .uno-btn { padding: 0.8rem 1.5rem; font-size: 1rem; font-weight: 800; border-radius: 50px; border: 2px solid white; cursor: pointer; color: white; transition: all 0.2s;}
         #call-uno-btn { background-color: transparent; border-color: #eab308; color: #eab308; display: none; }
@@ -138,6 +150,7 @@
             <div id="direction-ring" class="spin-cw"></div>
             <div id="turn-timer">15s</div>
             <div class="card-cluster">
+                <div id="draw-arrow" class="bouncing-arrow">⬇</div>
                 <div id="draw-deck" class="uno-card bg-deck" onclick="drawCard()">DRAW</div>
                 <div id="discard-pile" class="uno-card bg-red"></div>
             </div>
@@ -176,7 +189,6 @@
         const dirRing = document.getElementById('direction-ring');
         const timerDisplay = document.getElementById('turn-timer');
         
-        // --- SOUND SYSTEM ---
         const sounds = {
             play: new Audio('/sounds/play.mp3'),
             draw: new Audio('/sounds/draw.mp3'),
@@ -209,7 +221,6 @@
             type: 'uno', username: myUsername, private: urlParams.get('private') === 'true', roomCode: urlParams.get('room') 
         });
 
-        // --- LOBBY LOGIC ---
         socket.on('lobbyUpdate', (data) => {
             document.getElementById('pregame-lobby').style.display = 'flex';
             document.getElementById('arena-view').style.display = 'none';
@@ -242,7 +253,6 @@
 
         function startPrivateGame() { socket.emit('hostStartGame'); }
 
-        // --- GAMEPLAY SOCKETS ---
         socket.on('waitingForOpponent', (code) => {
             document.getElementById('game-header').style.display = 'block';
             statusDisplay.innerHTML = "Waiting for random opponent...";
@@ -277,10 +287,8 @@
             if (btn) btn.innerText = "Rematch Proposed! Accept?";
         });
 
-        // SHARED AUDIO CUE
         socket.on('playerCalledUno', () => {
             playSound('uno');
-            // Brief visual flash
             const originalText = statusDisplay.innerHTML;
             statusDisplay.innerHTML = `<span style="color: #eab308; font-size: 1.5rem; font-weight: bold;">📢 UNO called!</span>`;
             setTimeout(() => {
@@ -294,12 +302,11 @@
             if(btn) { btn.innerText = "Waiting for others..."; btn.disabled = true; }
         }
 
-        // --- GAME ACTIONS ---
         function toggleUno() {
             playSound('uno');
-            // Inform server instantly
             socket.emit('makeMove', { action: 'call_uno' });
         }
+        
         function catchUno() { if (gameActive) socket.emit('makeMove', { action: 'catch' }); }
         
         function drawCard() { 
@@ -335,7 +342,6 @@
             }, 1000);
         }
 
-        // --- MAIN RENDER LOOP ---
         function updateUI(state) {
             mySymbol = state.mySymbol;
             startTimer(); 
@@ -379,6 +385,8 @@
             myHandContainer.innerHTML = '';
             const isDrawing = state.myHand.length > previousHandCount;
             
+            let hasPlayableCard = false; 
+            
             state.myHand.forEach((card, index) => {
                 const cardEl = document.createElement('div');
                 cardEl.className = `uno-card bg-${card.color}`;
@@ -389,6 +397,8 @@
                 if (!isMyTurn || !canPlay(card, state.topCard)) {
                     cardEl.classList.add('disabled-card');
                 } else {
+                    hasPlayableCard = true; 
+                    
                     cardEl.onclick = () => {
                         if (!gameActive) return;
                         if (card.color === 'wild') {
@@ -402,6 +412,13 @@
                 myHandContainer.appendChild(cardEl);
             });
             previousHandCount = state.myHand.length;
+
+            const drawArrow = document.getElementById('draw-arrow');
+            if (isMyTurn && !hasPlayableCard) {
+                drawArrow.style.display = 'block';
+            } else {
+                drawArrow.style.display = 'none';
+            }
 
             const order = state.playerOrder;
             const myIndex = order.indexOf(mySymbol);
