@@ -141,7 +141,7 @@
 
             <div class="settings-panel" id="host-settings-panel" style="display: none;">
                 <h3 style="margin-top: 0; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">House Rules</h3>
-                <label><input type="checkbox" id="rule-playDrawn" checked onchange="pushRules()"> Play Drawn Card</label>
+                <label><input type="checkbox" id="rule-playDrawn" onchange="pushRules()"> Play Drawn Card</label>
                 <label><input type="checkbox" id="rule-drawUntilPlay" onchange="pushRules()"> Draw 'Til You Play</label>
                 <label><input type="checkbox" id="rule-stacking" onchange="pushRules()"> +2 / +4 Stacking</label>
                 <label><input type="checkbox" id="rule-jumpIn" onchange="pushRules()"> Jump-In (Exact Match)</label>
@@ -318,11 +318,11 @@
 
         function updateGuestRulesText(rules) {
             let active = [];
-            if (rules.playDrawn) active.push("Play Drawn Card");
-            if (rules.drawUntilPlay) active.push("Draw 'Til You Play");
-            if (rules.stacking) active.push("Stacking");
-            if (rules.jumpIn) active.push("Jump-In");
-            if (rules.zeroPass) active.push("0-Card Rotation");
+            if (rules.playDrawn) active.push("Play Drawn Card"/n);
+            if (rules.drawUntilPlay) active.push("Draw 'Til You Play"/n);
+            if (rules.stacking) active.push("Stacking"/n);
+            if (rules.jumpIn) active.push("Jump-In"/n);
+            if (rules.zeroPass) active.push("0-Card Rotation"/n);
             document.getElementById('active-rules-list').innerText = active.length > 0 ? active.join(' • ') : "Standard Rules";
         }
 

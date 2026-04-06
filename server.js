@@ -121,7 +121,6 @@ io.on('connection', (socket) => {
         const username = data.username || 'Guest';
         const isCreatingPrivate = data.private; 
         const joinCode = data.roomCode; 
-
         const config = GameConfig[gameType];
         const maxPlayers = config.maxPlayers;
         const isManualStart = config.manualStart;
