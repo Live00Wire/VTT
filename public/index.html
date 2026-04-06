@@ -204,6 +204,15 @@
                                 <button class="btn-private" onclick="window.location.href='games/connect-four.html?private=true'">Create Private Room</button>
                             </div>
                         </div>
+                        <div class="game-card">
+        <span class="game-icon">🃏</span>
+        <h3>Uno (Beta)</h3>
+        <p>2-4 Players</p>
+        <div class="card-buttons">
+            <button onclick="window.location.href='games/uno.html'">Find Public Match</button>
+            <button class="btn-private" onclick="window.location.href='games/uno.html?private=true'">Create Private Room</button>
+        </div>
+    </div>
                     </div>
 
                     <div class="private-join-box">
@@ -260,11 +269,23 @@
         }
 
         socket.on('roomFound', (data) => {
-            // Server found it! Redirect to the correct game page with the code.
-            const gamePage = data.type === 'ttt' ? 'tic-tac-toe.html' : 'connect-four.html';
-            window.location.href = `games/${gamePage}?room=${data.code}`;
-        });
+            // A dictionary mapping the server's game codes to your HTML files
+            const gamePages = {
+                'ttt': 'tic-tac-toe.html',
+                'c4': 'connect-four.html',
+                'uno': 'uno.html'
+            };
 
+            // Look up the correct page based on the code
+            const targetPage = gamePages[data.type];
+
+            if (targetPage) {
+                window.location.href = `games/${targetPage}?room=${data.code}`;
+            } else {
+                alert("Game type not recognized!");
+            }
+        });
+        
         socket.on('roomError', (msg) => { alert(msg); });
 
         function handleKeyPress(e, type) {
