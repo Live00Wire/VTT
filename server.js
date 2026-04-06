@@ -4,8 +4,13 @@ const { Server } = require('socket.io');
 
 const TicTacToe = require('./gameLogic/TicTacToe');
 const ConnectFour = require('./gameLogic/ConnectFour');
+const Uno = require('./gameLogic/Uno');
 
-const GameRegistry = { 'ttt': TicTacToe, 'c4': ConnectFour };
+const GameRegistry = { 
+    'ttt': TicTacToe, 
+    'c4': ConnectFour,
+    'uno': Uno
+};
 
 const app = express();
 const server = http.createServer(app);
@@ -101,12 +106,22 @@ io.on('connection', (socket) => {
             });
             room.nameMap = nameMap;
 
-            io.to(roomToJoin).emit('gameStart', {
-                board: room.gameInstance.board,
-                turn: room.gameInstance.turn,
-                symbols: room.gameInstance.symbols,
-                names: room.nameMap
-            });
+            // HIDDEN INFO CHECK
+            if (typeof room.gameInstance.getGameStateForPlayer === 'function') {
+                room.players.forEach(playerId => {
+                    io.to(playerId).emit('secretGameStart', {
+                        state: room.gameInstance.getGameStateForPlayer(playerId),
+                        names: room.nameMap
+                    });
+                });
+            } else {
+                io.to(roomToJoin).emit('gameStart', {
+                    board: room.gameInstance.board,
+                    turn: room.gameInstance.turn,
+                    symbols: room.gameInstance.symbols,
+                    names: room.nameMap
+                });
+            }
         } else {
             const newRoomId = 'room_' + socket.id;
             socket.join(newRoomId);
@@ -135,10 +150,18 @@ io.on('connection', (socket) => {
         if (isValidMove) {
             if (game.winner) {
                 io.to(roomId).emit('gameOver', { board: game.board, winner: game.winner, names: rooms[roomId].nameMap });
-                // We NO LONGER delete the room here, so they can rematch!
-                rooms[roomId].rematchRequests = []; // Clear old votes
+                rooms[roomId].rematchRequests = []; 
             } else {
-                io.to(roomId).emit('updateBoard', { board: game.board, turn: game.turn });
+                // HIDDEN INFO CHECK: Does this game use secret hands?
+                if (typeof game.getGameStateForPlayer === 'function') {
+                    // Send custom state to each player individually
+                    rooms[roomId].players.forEach(playerId => {
+                        io.to(playerId).emit('updateSecretBoard', game.getGameStateForPlayer(playerId));
+                    });
+                } else {
+                    // Public Information Game (TTT, Connect 4)
+                    io.to(roomId).emit('updateBoard', { board: game.board, turn: game.turn });
+                }
             }
         }
     });
