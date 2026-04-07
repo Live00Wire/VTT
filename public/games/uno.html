@@ -100,8 +100,9 @@
         #direction-ring { position: absolute; width: 340px; height: 340px; z-index: 1; pointer-events: none; opacity: 0.2; }
         .spin-cw { animation: spin 12s linear infinite; } 
         .spin-ccw { animation: spinReverse 12s linear infinite; }
+        .spin-ccw svg { transform: scaleX(-1); }
         @keyframes spin { 100% { transform: rotate(360deg); } } 
-        @keyframes spinReverse { 0% { transform: scaleX(-1) rotate(0deg); } 100% { transform: scaleX(-1) rotate(-360deg); } }
+        @keyframes spinReverse { 100% { transform: rotate(-360deg); } }
 
         .stack-bubble {
             position: absolute; top: -15px; right: -15px; background: #ef4444; color: white;
@@ -121,10 +122,29 @@
         #start-game-btn { background-color: #10b981; border-color: #10b981; font-size: 1.5rem; padding: 1rem 3rem; }
         #start-game-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        #color-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 100; }
+        #color-modal, #end-game-modal, #pause-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; z-index: 100; flex-direction: column; }
         .color-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
         .color-btn { width: 100px; height: 100px; border-radius: 8px; border: 2px solid white; cursor: pointer; }
         .color-btn:hover { transform: scale(1.05); }
+        
+        #end-game-modal { z-index: 200; }
+        #pause-modal { z-index: 300; }
+
+        #room-chat-container {
+            position: fixed; top: 1rem; right: 1rem; width: 300px; height: 350px;
+            background: rgba(0,0,0,0.4); border: 1px solid var(--card-border); border-radius: 12px;
+            display: flex; flex-direction: column; z-index: 60; backdrop-filter: blur(10px);
+        }
+        #room-chat-messages {
+            flex: 1; padding: 10px; overflow-y: auto; font-size: 0.9rem;
+            display: flex; flex-direction: column; gap: 5px;
+        }
+        .chat-msg { background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 8px; word-wrap: break-word; }
+        .chat-msg b { color: var(--accent); }
+        #room-chat-input {
+            background: transparent; border: none; border-top: 1px solid var(--card-border);
+            color: white; padding: 12px; font-size: 0.9rem; font-family: 'Inter', sans-serif; outline: none;
+        }
     </style>
 </head>
 <body>
@@ -141,7 +161,7 @@
 
             <div class="settings-panel" id="host-settings-panel" style="display: none;">
                 <h3 style="margin-top: 0; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">House Rules</h3>
-                <label><input type="checkbox" id="rule-playDrawn" onchange="pushRules()"> Play Drawn Card</label>
+                <label><input type="checkbox" id="rule-playDrawn" checked onchange="pushRules()"> Play Drawn Card</label>
                 <label><input type="checkbox" id="rule-drawUntilPlay" onchange="pushRules()"> Draw 'Til You Play</label>
                 <label><input type="checkbox" id="rule-stacking" onchange="pushRules()"> +2 / +4 Stacking</label>
                 <label><input type="checkbox" id="rule-jumpIn" onchange="pushRules()"> Jump-In (Exact Match)</label>
@@ -171,17 +191,19 @@
         <div class="pos-right" id="slot-right"></div>
 
         <div class="pos-center">
-            <svg id="direction-ring" class="spin-cw" viewBox="0 0 200 200">
-                <defs>
-                    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                      <path d="M 0 1 L 8 5 L 0 9 z" fill="#fff" />
-                    </marker>
-                </defs>
-                <path d="M 100 10 A 90 90 0 0 1 190 100" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
-                <path d="M 190 100 A 90 90 0 0 1 100 190" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
-                <path d="M 100 190 A 90 90 0 0 1 10 100" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
-                <path d="M 10 100 A 90 90 0 0 1 100 10" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
-            </svg>
+            <div id="direction-ring" class="spin-cw">
+                <svg viewBox="0 0 200 200" style="width: 100%; height: 100%;">
+                    <defs>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                          <path d="M 0 1 L 8 5 L 0 9 z" fill="#fff" />
+                        </marker>
+                    </defs>
+                    <path d="M 100 10 A 90 90 0 0 1 190 100" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
+                    <path d="M 190 100 A 90 90 0 0 1 100 190" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
+                    <path d="M 100 190 A 90 90 0 0 1 10 100" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
+                    <path d="M 10 100 A 90 90 0 0 1 100 10" fill="none" stroke="#fff" stroke-width="4" marker-end="url(#arrow)" />
+                </svg>
+            </div>
 
             <div id="turn-timer">15s</div>
             <div class="card-cluster">
@@ -217,6 +239,26 @@
         </div>
     </div>
 
+    <div id="end-game-modal">
+        <h1 id="end-game-title" style="font-size: 4rem; margin-top: 0; margin-bottom: 1rem; text-shadow: 0 4px 6px rgba(0,0,0,0.5);"></h1>
+        <p id="end-game-subtitle" style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 2rem;"></p>
+        <div style="display: flex; gap: 1rem;">
+            <button id="modal-rematch-btn" class="uno-btn" style="background-color: #10b981; border-color: #10b981; font-size: 1.5rem; padding: 1rem 2rem;" onclick="requestRematch()">Request Rematch</button>
+            <button class="uno-btn" style="background-color: transparent; border-color: var(--card-border); font-size: 1.5rem; padding: 1rem 2rem;" onclick="window.location.href='../index.html'">Leave Room</button>
+        </div>
+    </div>
+
+    <div id="pause-modal">
+        <h1 style="color: #ef4444; font-size: 3rem; margin: 0;">Game Paused</h1>
+        <p id="pause-text" style="color: var(--text-main); font-size: 1.5rem;"></p>
+        <button id="vote-restart-btn" class="uno-btn" style="background-color: #3b82f6; border-color: #3b82f6; margin-top: 1rem;" onclick="voteRestart()">Vote to Restart Lobby</button>
+    </div>
+
+    <div id="room-chat-container">
+        <div id="room-chat-messages"></div>
+        <input type="text" id="room-chat-input" placeholder="Type a message..." autocomplete="off" />
+    </div>
+
     <script>
         const socket = io();
         const statusDisplay = document.getElementById('status-display');
@@ -226,11 +268,20 @@
         const myHandContainer = document.getElementById('my-hand');
         const myCardCount = document.getElementById('my-card-count');
         const colorModal = document.getElementById('color-modal');
+        const endGameModal = document.getElementById('end-game-modal');
+        const endGameTitle = document.getElementById('end-game-title');
+        const endGameSubtitle = document.getElementById('end-game-subtitle');
+        const modalRematchBtn = document.getElementById('modal-rematch-btn');
+        const pauseModal = document.getElementById('pause-modal');
+        const pauseText = document.getElementById('pause-text');
+        const voteRestartBtn = document.getElementById('vote-restart-btn');
         const callUnoBtn = document.getElementById('call-uno-btn');
         const catchBtn = document.getElementById('catch-btn');
         const passBtn = document.getElementById('pass-btn');
         const dirRing = document.getElementById('direction-ring');
         const timerDisplay = document.getElementById('turn-timer');
+        const chatInput = document.getElementById('room-chat-input');
+        const chatMessages = document.getElementById('room-chat-messages');
         
         const sounds = {
             play: new Audio('/sounds/play.mp3'),
@@ -258,17 +309,31 @@
         let previousHandCount = 0; 
         let isLobbyHost = false;
 
+        let mySessionId = localStorage.getItem('nexusSessionId');
+        if (!mySessionId) {
+            mySessionId = Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('nexusSessionId', mySessionId);
+        }
+
         const myUsername = localStorage.getItem('nexusUsername') || 'Guest';
         const urlParams = new URLSearchParams(window.location.search);
         
         socket.emit('joinGame', { 
-            type: 'uno', username: myUsername, private: urlParams.get('private') === 'true', roomCode: urlParams.get('room') 
+            type: 'uno', 
+            username: myUsername, 
+            private: urlParams.get('private') === 'true', 
+            roomCode: urlParams.get('room'),
+            sessionId: mySessionId
         });
 
         socket.on('lobbyUpdate', (data) => {
             document.getElementById('pregame-lobby').style.display = 'flex';
             document.getElementById('arena-view').style.display = 'none';
             document.getElementById('game-header').style.display = 'none';
+            endGameModal.style.display = 'none';
+            pauseModal.style.display = 'none';
+            gameActive = false;
+            if(turnTimerInterval) clearInterval(turnTimerInterval);
             
             document.getElementById('lobby-code-display').innerText = data.code ? `Room Code: ${data.code}` : "Public Room";
             document.getElementById('lobby-count-text').innerText = `Players (${data.players.length}/${data.maxPlayers})`;
@@ -318,11 +383,11 @@
 
         function updateGuestRulesText(rules) {
             let active = [];
-            if (rules.playDrawn) active.push("Play Drawn Card"/n);
-            if (rules.drawUntilPlay) active.push("Draw 'Til You Play"/n);
-            if (rules.stacking) active.push("Stacking"/n);
-            if (rules.jumpIn) active.push("Jump-In"/n);
-            if (rules.zeroPass) active.push("0-Card Rotation"/n);
+            if (rules.playDrawn) active.push("Play Drawn Card");
+            if (rules.drawUntilPlay) active.push("Draw 'Til You Play");
+            if (rules.stacking) active.push("Stacking");
+            if (rules.jumpIn) active.push("Jump-In");
+            if (rules.zeroPass) active.push("0-Card Rotation");
             document.getElementById('active-rules-list').innerText = active.length > 0 ? active.join(' • ') : "Standard Rules";
         }
 
@@ -336,6 +401,8 @@
 
         socket.on('secretGameStart', (data) => {
             document.getElementById('pregame-lobby').style.display = 'none';
+            endGameModal.style.display = 'none';
+            pauseModal.style.display = 'none';
             document.getElementById('arena-view').style.display = 'grid';
             document.getElementById('game-header').style.display = 'block';
 
@@ -349,30 +416,75 @@
         socket.on('gameOver', (data) => {
             playSound('win');
             gameActive = false; clearInterval(turnTimerInterval);
-            statusDisplay.innerHTML = `<span style="color: #10b981;">Winner: ${playerNames[data.winner]}!</span>`;
+            statusDisplay.innerHTML = "Game Over";
             
-            document.getElementById('my-hand').innerHTML = `
-                <button class="uno-btn" id="rematch-btn" style="background:#10b981; border-color:#10b981; font-size:1.5rem;" onclick="requestRematch()">Request Rematch</button>
-                <button class="uno-btn" style="background:transparent; border-color:var(--card-border); font-size:1.5rem;" onclick="window.location.href='../index.html'">Leave</button>
-            `;
+            const isMe = playerNames[data.winner] === playerNames[mySymbol];
+            endGameTitle.innerText = isMe ? "You Won!" : `${playerNames[data.winner]} Won!`;
+            endGameTitle.style.color = isMe ? "#10b981" : "#eab308";
+            endGameSubtitle.innerText = "Do you want to play another round?";
+            
+            modalRematchBtn.style.display = 'inline-block';
+            modalRematchBtn.innerText = "Request Rematch";
+            modalRematchBtn.disabled = false;
+            pauseModal.style.display = 'none';
+            endGameModal.style.display = 'flex';
+        });
+
+        socket.on('rematchUpdate', (data) => {
+            if (modalRematchBtn) {
+                if (modalRematchBtn.disabled) {
+                    modalRematchBtn.innerText = `Waiting for others... (${data.current}/${data.total})`;
+                } else {
+                    modalRematchBtn.innerText = `Accept Rematch (${data.current}/${data.total})`;
+                }
+            }
         });
 
         socket.on('rematchProposed', () => {
-            const btn = document.getElementById('rematch-btn');
-            if (btn) btn.innerText = "Rematch Proposed! Accept?";
+            if(modalRematchBtn && !modalRematchBtn.disabled) modalRematchBtn.innerText = "Rematch Proposed! Accept?";
         });
 
         socket.on('playerCalledUno', () => {
             playSound('uno');
             const originalText = statusDisplay.innerHTML;
-            statusDisplay.innerHTML = `<span style="color: #eab308; font-size: 1.5rem; font-weight: bold;">UNO called!</span>`;
+            statusDisplay.innerHTML = `<span style="color: #eab308; font-size: 1.5rem; font-weight: bold;">📢 UNO called!</span>`;
             setTimeout(() => { if(gameActive) statusDisplay.innerHTML = originalText; }, 1500); 
+        });
+
+        socket.on('playerDisconnectWarning', (name) => {
+            pauseText.innerText = `${name} disconnected! Waiting for reconnect (20s)...`;
+            voteRestartBtn.innerText = "Vote to Restart Lobby";
+            voteRestartBtn.disabled = false;
+            pauseModal.style.display = 'flex';
+        });
+
+        socket.on('playerReconnected', (name) => {
+            pauseModal.style.display = 'none';
+            voteRestartBtn.disabled = false;
+            voteRestartBtn.innerText = "Vote to Restart Lobby";
+            const originalText = statusDisplay.innerHTML;
+            statusDisplay.innerHTML = `<span style="color: #10b981; font-weight: bold;">✅ ${name} reconnected!</span>`;
+            setTimeout(() => { if(gameActive) statusDisplay.innerHTML = originalText; }, 2000); 
+        });
+
+        socket.on('restartVoteUpdate', (data) => {
+            if (voteRestartBtn) {
+                if (voteRestartBtn.disabled) {
+                    voteRestartBtn.innerText = `Waiting for others... (${data.current}/${data.total})`;
+                } else {
+                    voteRestartBtn.innerText = `Vote to Restart Lobby (${data.current}/${data.total})`;
+                }
+            }
         });
 
         function requestRematch() {
             socket.emit('requestRematch');
-            const btn = document.getElementById('rematch-btn');
-            if(btn) { btn.innerText = "Waiting for others..."; btn.disabled = true; }
+            if(modalRematchBtn) { modalRematchBtn.innerText = "Voting..."; modalRematchBtn.disabled = true; }
+        }
+
+        function voteRestart() {
+            socket.emit('voteRestartLobby');
+            if (voteRestartBtn) { voteRestartBtn.innerText = "Voting..."; voteRestartBtn.disabled = true; }
         }
 
         function toggleUno() { playSound('uno'); socket.emit('makeMove', { action: 'call_uno' }); }
@@ -419,12 +531,8 @@
             if (isMyTurn && !wasMyTurn) playSound('turn');
             wasMyTurn = isMyTurn;
 
-            dirRing.className = state.direction === 1 ? 'spin-cw' : 'spin-ccw';
+            dirRing.setAttribute('class', state.direction === 1 ? 'spin-cw' : 'spin-ccw');
             
-            if (state.unoSafe) { callUnoBtn.classList.add('active'); callUnoBtn.innerText = "UNO! (Safe)"; } 
-            else { callUnoBtn.classList.remove('active'); callUnoBtn.innerText = "Call UNO!"; }
-            
-            callUnoBtn.style.display = (state.myHand.length <= 2 && isMyTurn) ? 'inline-block' : 'none';
             passBtn.style.display = (isMyTurn && state.hasDrawn) ? 'inline-block' : 'none';
             
             let anyoneVulnerable = false;
@@ -445,7 +553,7 @@
             if (state.stackPenalty > 0) {
                 stackBubble.innerText = `+${state.stackPenalty}`;
                 stackBubble.style.display = 'flex';
-                statusDisplay.innerHTML += `<div style="color: #ef4444; font-weight: bold; animation: pulse 0.5s infinite;">STACK INCOMING! Play a + card or Draw!</div>`;
+                statusDisplay.innerHTML += `<div style="color: #ef4444; font-weight: bold; animation: pulse 0.5s infinite;">⚠️ STACK INCOMING! Play a + card or Draw!</div>`;
             } else {
                 stackBubble.style.display = 'none';
             }
@@ -503,6 +611,18 @@
             });
             previousHandCount = state.myHand.length;
 
+            const canReachOneCard = (state.myHand.length === 2 && hasPlayableCard) || state.myHand.length === 1;
+            
+            if (state.unoSafe) { 
+                callUnoBtn.classList.add('active'); 
+                callUnoBtn.innerText = "UNO! (Safe)"; 
+            } else { 
+                callUnoBtn.classList.remove('active'); 
+                callUnoBtn.innerText = "Call UNO!"; 
+            }
+            
+            callUnoBtn.style.display = (isMyTurn && canReachOneCard) ? 'inline-block' : 'none';
+
             const drawArrow = document.getElementById('draw-arrow');
             if (isMyTurn && !hasPlayableCard && !state.hasDrawn) drawArrow.style.display = 'block';
             else drawArrow.style.display = 'none';
@@ -552,7 +672,28 @@
 
         socket.on('opponentLeft', () => {
             gameActive = false;
-            document.getElementById('arena-view').innerHTML = `<div style="grid-column: 1 / -1; grid-row: 2; text-align: center;"><h3>Someone disconnected.</h3><button class="uno-btn" onclick="window.location.href='../index.html'">Return to Lobby</button></div>`;
+            clearInterval(turnTimerInterval);
+            endGameTitle.innerText = "Opponent Disconnected";
+            endGameTitle.style.color = "#ef4444";
+            endGameSubtitle.innerText = "Someone has abandoned the match.";
+            modalRematchBtn.style.display = 'none';
+            pauseModal.style.display = 'none';
+            endGameModal.style.display = 'flex';
+        });
+
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && chatInput.value.trim() !== '') {
+                socket.emit('sendRoomChat', chatInput.value.trim());
+                chatInput.value = '';
+            }
+        });
+
+        socket.on('roomChatMessage', (data) => {
+            const msgEl = document.createElement('div');
+            msgEl.className = 'chat-msg';
+            msgEl.innerHTML = `<b>${data.user}:</b> ${data.text}`;
+            chatMessages.appendChild(msgEl);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         });
     </script>
 </body>

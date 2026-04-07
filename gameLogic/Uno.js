@@ -1,6 +1,6 @@
 class Uno {
     constructor(players, rules = {}) {
-        this.players = players; 
+        this.players = [...players]; 
         this.hands = {};
         this.symbols = {};
         this.unoSafe = {}; 
@@ -39,6 +39,30 @@ class Uno {
                 this.deck.unshift(firstCard); 
             } else { this.discardPile.push(firstCard); }
         } while (this.discardPile.length === 0);
+    }
+
+    updatePlayerId(oldId, newId) {
+        const index = this.players.indexOf(oldId);
+        if (index !== -1) {
+            this.players[index] = newId;
+        }
+        
+        if (this.hands[oldId] !== undefined) {
+            this.hands[newId] = this.hands[oldId];
+            delete this.hands[oldId];
+        }
+        
+        if (this.symbols[oldId] !== undefined) {
+            this.symbols[newId] = this.symbols[oldId];
+            delete this.symbols[oldId];
+        }
+        
+        if (this.unoSafe[oldId] !== undefined) {
+            this.unoSafe[newId] = this.unoSafe[oldId];
+            delete this.unoSafe[oldId];
+        }
+        
+        return true;
     }
 
     generateDeck() {
@@ -87,7 +111,7 @@ class Uno {
         if (actionData.action === 'catch') {
             let caughtSomeone = false;
             this.players.forEach(victimId => {
-                if (this.hands[victimId].length === 1 && !this.unoSafe[victimId]) {
+                if (this.hands[victimId] && this.hands[victimId].length === 1 && !this.unoSafe[victimId]) {
                     this.hands[victimId].push(this.drawCardSafe());
                     this.hands[victimId].push(this.drawCardSafe());
                     caughtSomeone = true;
@@ -97,8 +121,22 @@ class Uno {
         }
 
         if (actionData.action === 'call_uno') {
-            if (this.players[this.turnIndex] === playerId && this.hands[playerId].length <= 2 && !this.unoSafe[playerId]) {
-                this.unoSafe[playerId] = true; return true; 
+            if (this.players[this.turnIndex] === playerId && !this.unoSafe[playerId]) {
+                const hand = this.hands[playerId];
+                let hasPlayable = false;
+                
+                for (let card of hand) {
+                    if (this.stackPenalty > 0) {
+                        if (card.value === 'draw2' || card.value === 'wild4') hasPlayable = true;
+                    } else if (this.canPlay(card)) {
+                        hasPlayable = true;
+                    }
+                }
+
+                if ((hand.length === 2 && hasPlayable) || hand.length === 1) {
+                    this.unoSafe[playerId] = true; 
+                    return true; 
+                }
             }
             return false;
         }
@@ -245,12 +283,12 @@ class Uno {
         const safePlayers = {}; 
         
         this.players.forEach(id => {
-            if (id !== playerId) opponentCardCounts[this.symbols[id]] = this.hands[id].length;
-            safePlayers[this.symbols[id]] = this.unoSafe[id];
+            if (id !== playerId && this.hands[id]) opponentCardCounts[this.symbols[id]] = this.hands[id].length;
+            if (this.symbols[id]) safePlayers[this.symbols[id]] = this.unoSafe[id];
         });
 
         return {
-            myHand: this.hands[playerId],
+            myHand: this.hands[playerId] || [],
             topCard: this.getTopCard(),
             currentTurn: this.symbols[this.players[this.turnIndex]], 
             direction: this.direction,

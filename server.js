@@ -37,7 +37,10 @@ function getLobbyState(room, code, max) {
 function resetTurnTimer(roomId, io) {
     const room = rooms[roomId];
     if (!room || !room.isStarted || !room.gameInstance || room.gameInstance.winner || room.type !== 'uno') {
-        if (room && room.turnTimer) clearTimeout(room.turnTimer);
+        if (room && room.turnTimer) {
+            clearTimeout(room.turnTimer);
+            room.turnTimer = null;
+        }
         return;
     }
 
@@ -55,6 +58,7 @@ function resetTurnTimer(roomId, io) {
                 io.to(roomId).emit('gameOver', { board: game.board, winner: game.winner, names: room.nameMap });
                 room.rematchRequests = [];
                 clearTimeout(room.turnTimer);
+                room.turnTimer = null;
             } else {
                 room.players.forEach(pId => {
                     io.to(pId).emit('updateSecretBoard', game.getGameStateForPlayer(pId));
@@ -86,13 +90,11 @@ function startGameInstance(room, roomId, io) {
     } else {
         io.to(roomId).emit('gameStart', { board: room.gameInstance.board, turn: room.gameInstance.turn, symbols: room.gameInstance.symbols, names: room.nameMap });
     }
-    console.log(`Match started in room ${roomId}`);
     
     if (room.type === 'uno') resetTurnTimer(roomId, io);
 }
 
 io.on('connection', (socket) => {
-    console.log('Player connected:', socket.id);
 
     socket.on('joinLobby', (username) => {
         socket.username = username;
@@ -102,6 +104,14 @@ io.on('connection', (socket) => {
 
     socket.on('sendLobbyChat', (message) => {
         if (socket.username) io.to('lobby').emit('chatMessage', { user: socket.username, text: message });
+    });
+
+    socket.on('sendRoomChat', (message) => {
+        const roomId = socket.roomId;
+        if (roomId && rooms[roomId]) {
+            const senderName = rooms[roomId].usernames[socket.id] || socket.username || 'Player';
+            io.to(roomId).emit('roomChatMessage', { user: senderName, text: message });
+        }
     });
 
     socket.on('checkRoom', (code) => {
@@ -121,6 +131,50 @@ io.on('connection', (socket) => {
         const username = data.username || 'Guest';
         const isCreatingPrivate = data.private; 
         const joinCode = data.roomCode; 
+        const sessionId = data.sessionId;
+
+        socket.username = username;
+        socket.sessionId = sessionId;
+
+        for (const rId in rooms) {
+            const room = rooms[rId];
+            if (room.isStarted && room.disconnected && room.disconnected[sessionId]) {
+                const oldSocketId = room.disconnected[sessionId].socketId;
+                clearTimeout(room.disconnected[sessionId].timeout);
+                delete room.disconnected[sessionId];
+
+                const pIndex = room.players.indexOf(oldSocketId);
+                if (pIndex !== -1) room.players[pIndex] = socket.id;
+                
+                room.usernames[socket.id] = room.usernames[oldSocketId];
+                delete room.usernames[oldSocketId];
+                
+                if (room.host === oldSocketId) room.host = socket.id;
+
+                const rIndex = room.rematchRequests.indexOf(oldSocketId);
+                if (rIndex !== -1) room.rematchRequests[rIndex] = socket.id;
+                
+                room.restartVotes = [];
+
+                socket.join(rId);
+                socket.roomId = rId;
+
+                if (room.gameInstance && typeof room.gameInstance.updatePlayerId === 'function') {
+                    room.gameInstance.updatePlayerId(oldSocketId, socket.id);
+                    
+                    socket.emit('secretGameStart', { state: room.gameInstance.getGameStateForPlayer(socket.id), names: room.nameMap });
+                    io.to(rId).emit('playerReconnected', room.usernames[socket.id]);
+                    
+                    room.players.forEach(pId => {
+                        io.to(pId).emit('updateSecretBoard', room.gameInstance.getGameStateForPlayer(pId));
+                    });
+
+                    resetTurnTimer(rId, io);
+                }
+                return; 
+            }
+        }
+
         const config = GameConfig[gameType];
         const maxPlayers = config.maxPlayers;
         const isManualStart = config.manualStart;
@@ -153,7 +207,7 @@ io.on('connection', (socket) => {
             rooms[newCode] = {
                 type: gameType, players: [socket.id], usernames: { [socket.id]: username },
                 gameInstance: null, isPrivate: true, isStarted: false, host: socket.id, rematchRequests: [],
-                rules: defaultRules, turnTimer: null
+                rules: defaultRules, turnTimer: null, disconnected: {}, restartVotes: []
             };
 
             if (isManualStart) socket.emit('lobbyUpdate', getLobbyState(rooms[newCode], newCode, maxPlayers));
@@ -186,7 +240,7 @@ io.on('connection', (socket) => {
                 rooms[newRoomId] = {
                     type: gameType, players: [socket.id], usernames: { [socket.id]: username },
                     gameInstance: null, isPrivate: false, isStarted: false, host: socket.id, rematchRequests: [],
-                    rules: defaultRules, turnTimer: null
+                    rules: defaultRules, turnTimer: null, disconnected: {}, restartVotes: []
                 };
 
                 if (isManualStart) socket.emit('lobbyUpdate', getLobbyState(rooms[newRoomId], null, maxPlayers));
@@ -227,7 +281,10 @@ io.on('connection', (socket) => {
             if (game.winner) {
                 io.to(roomId).emit('gameOver', { board: game.board, winner: game.winner, names: rooms[roomId].nameMap });
                 rooms[roomId].rematchRequests = []; 
-                if (rooms[roomId].turnTimer) clearTimeout(rooms[roomId].turnTimer);
+                if (rooms[roomId].turnTimer) {
+                    clearTimeout(rooms[roomId].turnTimer);
+                    rooms[roomId].turnTimer = null;
+                }
             } else {
                 if (typeof game.getGameStateForPlayer === 'function') {
                     rooms[roomId].players.forEach(playerId => {
@@ -245,28 +302,98 @@ io.on('connection', (socket) => {
         const roomId = socket.roomId;
         if (!roomId || !rooms[roomId]) return;
         const room = rooms[roomId];
-        if (!room.rematchRequests.includes(socket.id)) room.rematchRequests.push(socket.id);
+        
+        if (!room.rematchRequests.includes(socket.id)) {
+            room.rematchRequests.push(socket.id);
+        }
 
         if (room.rematchRequests.length === room.players.length) {
             room.rematchRequests = []; 
             startGameInstance(room, roomId, io);
-        } else { socket.to(roomId).emit('rematchProposed'); }
+        } else {
+            io.to(roomId).emit('rematchUpdate', {
+                current: room.rematchRequests.length,
+                total: room.players.length
+            });
+        }
+    });
+
+    socket.on('voteRestartLobby', () => {
+        const roomId = socket.roomId;
+        if (!roomId || !rooms[roomId]) return;
+        const room = rooms[roomId];
+
+        if (!room.restartVotes) room.restartVotes = [];
+        if (!room.restartVotes.includes(socket.id)) {
+            room.restartVotes.push(socket.id);
+        }
+
+        const activePlayers = room.players.filter(pId => {
+            return !Object.values(room.disconnected || {}).some(d => d.socketId === pId);
+        });
+
+        if (activePlayers.length > 0 && room.restartVotes.length >= activePlayers.length) {
+            if (room.turnTimer) {
+                clearTimeout(room.turnTimer);
+                room.turnTimer = null;
+            }
+            if (room.disconnected) {
+                Object.values(room.disconnected).forEach(d => clearTimeout(d.timeout));
+            }
+            
+            room.players = activePlayers;
+            if (!activePlayers.includes(room.host)) room.host = activePlayers[0];
+            
+            room.disconnected = {};
+            room.restartVotes = [];
+            room.isStarted = false;
+            room.gameInstance = null;
+            
+            io.to(roomId).emit('lobbyUpdate', getLobbyState(room, roomId, GameConfig[room.type].maxPlayers));
+        } else {
+            io.to(roomId).emit('restartVoteUpdate', { current: room.restartVotes.length, total: activePlayers.length });
+        }
     });
 
     socket.on('disconnect', () => {
         if (socket.username) io.to('lobby').emit('systemMessage', `${socket.username} left the tavern.`);
         const roomId = socket.roomId;
         if (roomId && rooms[roomId]) {
-            if (rooms[roomId].turnTimer) clearTimeout(rooms[roomId].turnTimer);
-            if (!rooms[roomId].isStarted && rooms[roomId].isPrivate && GameConfig[rooms[roomId].type].manualStart) {
-                rooms[roomId].players = rooms[roomId].players.filter(id => id !== socket.id);
-                if (rooms[roomId].host === socket.id || rooms[roomId].players.length === 0) {
-                    socket.to(roomId).emit('opponentLeft'); delete rooms[roomId];
-                } else {
-                    io.to(roomId).emit('lobbyUpdate', getLobbyState(rooms[roomId], roomId, GameConfig[rooms[roomId].type].maxPlayers));
+            const room = rooms[roomId];
+            if (room.isStarted && room.type === 'uno') {
+                if (!room.disconnected) room.disconnected = {};
+                
+                io.to(roomId).emit('playerDisconnectWarning', room.usernames[socket.id]);
+                
+                if (room.turnTimer) {
+                    clearTimeout(room.turnTimer);
+                    room.turnTimer = null;
                 }
+
+                room.disconnected[socket.sessionId] = {
+                    socketId: socket.id,
+                    timeout: setTimeout(() => {
+                        io.to(roomId).emit('opponentLeft');
+                        if (room.turnTimer) clearTimeout(room.turnTimer);
+                        delete rooms[roomId];
+                    }, 20000) 
+                };
+                room.restartVotes = [];
             } else {
-                socket.to(roomId).emit('opponentLeft'); delete rooms[roomId];
+                if (room.turnTimer) {
+                    clearTimeout(room.turnTimer);
+                    room.turnTimer = null;
+                }
+                if (!room.isStarted && room.isPrivate && GameConfig[room.type].manualStart) {
+                    room.players = room.players.filter(id => id !== socket.id);
+                    if (room.host === socket.id || room.players.length === 0) {
+                        socket.to(roomId).emit('opponentLeft'); delete rooms[roomId];
+                    } else {
+                        io.to(roomId).emit('lobbyUpdate', getLobbyState(room, roomId, GameConfig[room.type].maxPlayers));
+                    }
+                } else {
+                    socket.to(roomId).emit('opponentLeft'); delete rooms[roomId];
+                }
             }
         }
     });
